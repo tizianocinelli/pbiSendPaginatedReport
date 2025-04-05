@@ -1,0 +1,91 @@
+# Guida: Creazione App Registration e Permessi Azure
+
+Questa guida spiega come creare una **App Registration in Entra ID (Azure AD)** e assegnare i **permessi necessari sul gruppo di risorse** per l'utilizzo da parte di un Azure Automation Runbook che controlla una capacità Power BI Embedded.
+
+---
+
+## 1. Registrare l'app su Entra ID
+
+1. Vai su **Azure Portal** > **Microsoft Entra ID** > **App registrations**
+2. Clicca su **"New registration"**
+3. Compila i campi:
+   - **Name**: `Runbook-PowerBI-App`
+   - **Supported account types**: *Accounts in this organizational directory only*
+   - **Redirect URI**: vuoto o `https://localhost`
+4. Clicca **Register**
+
+---
+
+## 2. Salva i dati dell'app
+
+Dopo la registrazione, prendi nota da **Overview**:
+
+- **Application (client) ID** → `SP-App-ClientId`
+- **Directory (tenant) ID** → `SP-App-TenantId`
+
+---
+
+## 3. Crea un Client Secret
+
+1. Vai su **Certificates & secrets** > **Client secrets**
+2. Clicca **New client secret**
+   - Descrizione: `RunbookSecret`
+   - Scadenza: 6-12 mesi: ‼️‼️METTI UNA SVEGLIA PER QUANDO SCADE‼️‼️
+3. Clicca **Add** e **copia subito il valore generato**
+
+Questo valore sarà usato per `SP-App-ClientSecret`
+
+---
+
+## 4. Assegna permessi al Resource Group
+
+1. Vai su **Resource groups** > seleziona il gruppo (es. `Power-BI`)
+2. Vai su **Access control (IAM)** > **Add > Add role assignment**
+3. Configura:
+   - **Role**: `Contributor`
+   - **Assign access to**: `User, group, or service principal`
+   - **Seleziona la tua App**: `Runbook-PowerBI-App`
+4. Salva
+
+---
+
+## 5. (Opzionale) Aggiungi API permissions per Power BI
+
+Solo se utilizzi le REST API di Power BI (non necessario per i moduli `Az.*`):
+
+1. Vai su **API permissions** > **Add a permission**
+2. Cerca e seleziona **Power BI Service**
+3. Aggiungi:
+   - `Capacity.ReadWrite.All`
+   - `Report.Read.All` (se esporti report)
+4. Clicca su **Grant admin consent**
+
+---
+
+## 6. Crea le variabili in Azure Automation
+
+Accedi al tuo **Azure Automation Account** > **Variables** e crea le seguenti variabili:
+
+| Nome variabile        | Tipo   | Contenuto                    |
+|-----------------------|--------|------------------------------|
+| `SP-App-ClientId`     | String | Application (Client) ID      |
+| `SP-App-ClientSecret` | String | Client secret — **criptata** |
+| `SP-App-TenantId`     | String | Directory (Tenant) ID        |
+
+---
+
+## 7. Test di connessione PowerShell
+
+Puoi testare la connessione con lo snippet seguente:
+
+```powershell
+Connect-AzAccount -ServicePrincipal `
+    -TenantId "<tenantId>" `
+    -Credential (New-Object PSCredential("<clientId>", (ConvertTo-SecureString "<clientSecret>" -AsPlainText -Force)))
+```
+
+---
+
+## ✅ L'app è pronta!
+
+Ora la tua App Registration è pronta per essere utilizzata in un Azure Automation Runbook per gestire risorse Power BI Embedded in modo sicuro e automatizzato.
